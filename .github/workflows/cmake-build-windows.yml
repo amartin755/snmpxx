@@ -2,7 +2,7 @@ name: build-release-binary-windows
 
 # TODO: should be merged with linux workflow as matrix build
 
-on: [workflow_dispatch]
+on: [push, workflow_dispatch]
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -18,13 +18,9 @@ jobs:
     timeout-minutes: 15
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         ref: ${{ github.ref }}
-
-#    - name: Install Dependencies
-#      # install winpcap, we use an old version of nmap which offers an silent installer and includes winpcap
-#      run: Invoke-WebRequest -Uri "https://nmap.org/dist/nmap-7.12-setup.exe" -OutFile "nmap.exe"; Start-Process -Filepath "nmap.exe" -ArgumentList /S
 
     - name: Configure CMake
       # Use a bash shell so we can use the same syntax for environment variable
