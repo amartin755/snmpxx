@@ -49,42 +49,8 @@
   DESCRIPTION:
   Class implementation for SMI Counter32 class.
 =====================================================================*/
-char counter_cpp_version[]="@(#) SNMP++ $Id$";
 
 #include <libsnmp.h>
 
 #include "snmp_pp/counter.h"
 
-#ifdef SNMP_PP_NAMESPACE
-namespace Snmp_pp {
-#endif
-
-#if 0
-// general assignment from any Value
-SnmpSyntax& Counter32::operator=(const SnmpSyntax &in_val)
-{
-  if (this == &in_val) return *this; // handle assignement from itself
-
-  valid_flag = false;		// will get set true if really valid
-  if (in_val.valid())
-  {
-    switch (in_val.get_syntax())
-    {
-      case sNMP_SYNTAX_UINT32:
-   // case sNMP_SYNTAX_GAUGE32:    	.. indistinquishable from UINT32
-      case sNMP_SYNTAX_CNTR32:
-      case sNMP_SYNTAX_TIMETICKS:
-      case sNMP_SYNTAX_INT32:		// implied cast int -> uint
-	  smival.value.uNumber = ((Counter32 &)in_val).smival.value.uNumber;
-  	  valid_flag = true;
-	  break;
-    }
-  }
-  m_changed = true; 
-  return *this;
-}
-#endif
-
-#ifdef SNMP_PP_NAMESPACE
-} // end of namespace Snmp_pp
-#endif 

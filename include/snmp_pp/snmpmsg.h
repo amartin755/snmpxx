@@ -91,14 +91,14 @@ class DLLOPT SnmpMessage
 #ifdef _SNMPv3
                   v3MP* mpv3,
 #endif
-                  const Pdu &pdu,                // Pdu to serialize
+                  Pdu &pdu,                // Pdu to serialize
                   const OctetStr &community,     // community name to use
                   const snmp_version version,    // SNMP version, v1 or v2
                   const OctetStr *engine_id,     // optional v3
                   const OctetStr *security_name, // optional v3
                   const int security_model);     // optional v3
  public:
-	int load( const Pdu &pdu,              // Pdu to serialize
+	int load( Pdu &pdu,              // Pdu to serialize
                   const OctetStr &community,   // community name to use
                   const snmp_version version)  // SNMP version, v1 or v2
 	  { return load(
@@ -132,7 +132,7 @@ class DLLOPT SnmpMessage
 
 #ifdef _SNMPv3
 	int loadv3( v3MP* mpv3,                   // v3 message processing model
-                    const Pdu &pdu,               // Pdu to serialize
+                    Pdu &pdu,               // Pdu to serialize
                     const OctetStr &engine_id,    // engine_id to use
                     const OctetStr &sec_name,     // securit_name to use
                     const int sec_model,          // security_model to use

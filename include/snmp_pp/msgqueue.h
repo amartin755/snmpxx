@@ -104,6 +104,7 @@ class DLLOPT CSNMPMessage
 	       snmp_callback callBack,
 	       void * callData);
   virtual ~CSNMPMessage();
+  void Update(unsigned char *rawPdu, size_t rawPduLen);
   unsigned long GetId() const { return m_uniqueId; };
   void ResetId(const unsigned long newId) { m_uniqueId = newId; };
   void SetSendTime();
@@ -176,7 +177,8 @@ class DLLOPT CSNMPMessageQueue: public CEvents
 
     int DoRetries(const msec &sendtime);
 
-    int Done();
+    int Done() { return 0; }
+
     int Done(unsigned long);
 
  protected:

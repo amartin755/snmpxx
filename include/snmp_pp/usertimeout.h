@@ -188,7 +188,7 @@ class DLLOPT CUTEventQueue: public CEvents
 };
 
 #ifdef SNMP_PP_NAMESPACE
-}; // end of namespace Snmp_pp
+} // end of namespace Snmp_pp
 #endif 
 
 #endif // _SNMP_USERTIMEOUT_H_

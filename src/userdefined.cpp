@@ -243,5 +243,5 @@ int CUDEventQueue::HandleEvents(const int maxfds,
 })
 
 #ifdef SNMP_PP_NAMESPACE
-}; // end of namespace Snmp_pp
+} // end of namespace Snmp_pp
 #endif 

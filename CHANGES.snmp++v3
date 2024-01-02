@@ -1,3 +1,15 @@
+Changes snmp++v3.5.0
+====================
+
+- Fixed: When using an IPv6 socket to send a SNMPv3 request to an IPv4 target,
+  the engine id could not be discovered.
+- Fixed: Compile error with libressl >= 3.5.0 (Fabrice Fontaine)
+- Improved: Set message_id in Pdu after sending a request to be able to detect old responses:
+  Fixed scenario: Send request, send retry, response to first request is received and
+  processed to unknown pdu handler because of unknown message id. Matching to retry
+  request is done because of known request id.
+- Improved (security): Avoid timing attacks on authentication verification.
+
 Changes snmp++v3.4.10
 =====================
 

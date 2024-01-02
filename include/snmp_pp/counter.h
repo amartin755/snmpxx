@@ -111,8 +111,7 @@ class DLLOPT Counter32: public SnmpUInt32
   /**
    * Map other SnmpSyntax objects to Counter32.
    */
-  // SnmpSyntax& operator=(const SnmpSyntax &val);
-  using SnmpUInt32::operator = ;
+  using SnmpUInt32::operator=;
 
   /**
    * Overloaded assignment for Counter32.
@@ -136,7 +135,7 @@ class DLLOPT Counter32: public SnmpUInt32
    */
   Counter32& operator=(const unsigned long ul)
   {
-    SnmpUInt32::operator = (ul);
+    SnmpUInt32::operator=(ul);
     return *this;
   }
 };
