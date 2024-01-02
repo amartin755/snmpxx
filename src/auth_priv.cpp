@@ -1916,7 +1916,7 @@ int PrivAES::decrypt(const unsigned char *key,
 {
   if (*out_buffer_len < buffer_len) {
     debugprintf(0, "Output buffer too small (%d < %d)", *out_buffer_len, buffer_len);
-    return SNMPv3_USM_ENCRYPTION_ERROR;
+    return SNMPv3_USM_DECRYPTION_ERROR;
   }
 
   unsigned char initVect[16];

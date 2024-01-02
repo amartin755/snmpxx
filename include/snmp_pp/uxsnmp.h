@@ -471,7 +471,7 @@ class DLLOPT Snmp: public SnmpSynchronized
    * @note Every call to one of the notify_register() methods overwrites
    *       the previous given values.
    *
-   * @param trapids       - ids to listen for
+   * @param trapids       - trap ids to listen for
    * @param targets       - targets to listen for
    * @param callback      - User callback function to use
    * @param callback_data - User definable data pointer
