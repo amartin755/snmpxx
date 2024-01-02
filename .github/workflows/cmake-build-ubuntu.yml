@@ -1,4 +1,4 @@
-name: build-release-binary-ubuntu
+name: cmake-build-ubuntu
 
 # Note: currently only linux is address. Later on this will be changed to a matrix build
 
