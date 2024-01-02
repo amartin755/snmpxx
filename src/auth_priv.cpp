@@ -40,6 +40,10 @@
 #include <openssl/des.h>
 #include <openssl/aes.h>
 #include <openssl/evp.h>
+#include <openssl/err.h>
+#if OPENSSL_VERSION_NUMBER >= 0x30000000
+#include <openssl/provider.h> // needed since OpenSSL 3.0
+#endif
 #endif
 
 // Use internal functions for SHA and MD5 and libdes only
@@ -79,8 +83,9 @@ static const char *loggerModuleName = "snmp++.auth";
 
 /* -- START: Defines for OpenSSL -- */
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
-// OpenSSL versions up to 1.0.x and LibreSSL
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || \
+  (defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x30500000L)
+// OpenSSL versions up to 1.0.x and LibreSSL versions up to 3.4.x
 typedef EVP_MD_CTX            EVPHashStateType;
 
 int evpAllocAndInit(EVP_MD_CTX *ctx, const EVP_MD *md)
@@ -138,7 +143,7 @@ typedef EVP_MD_CTX*           MD5HashStateType;
 #define MD5_PROCESS(s, p, l)  EVP_DigestUpdate(*(s), p, l)
 #define MD5_DONE(s, k)        evpDigestFinalAndFree(s, k)
 
-#endif // OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+#endif // OPENSSL_VERSION_NUMBER < 0x10100000L || (defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x30500000L)
 
 typedef DES_key_schedule      DESCBCType;
 #define DES_CBC_START_ENCRYPT(c, iv, k, kl, r, s) \
@@ -456,6 +461,31 @@ AuthPriv::AuthPriv(int &construct_state)
     construct_state = SNMPv3_USM_ERROR;
   }
 #endif // defined(_USE_LIBTOMCRYPT) && !defined(_USE_OPENSSL)
+
+#if OPENSSL_VERSION_NUMBER >= 0x30000000
+
+  // Strange code needed for OpenSSL 3.0 :-(
+  const EVP_MD *md = EVP_get_digestbyname("MD5");
+  if (md == NULL) {
+    LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
+    LOG("AuthPriv: Error getting digest MD5.");
+    LOG_END;
+  }
+
+  EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+  EVP_DigestInit_ex2(mdctx, md, NULL);
+  EVP_MD_CTX_free(mdctx);
+
+  // Since OpenSSL 3.0 DES functions are only available via
+  // EVP functions if legacy provider is loaded
+  OSSL_PROVIDER *legacy_provider = OSSL_PROVIDER_load(NULL, "legacy");
+  if (!legacy_provider)
+  {
+    LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
+    LOG("AuthPriv: Error loading 'legacy' provider for OpenSSL. No DES encryption available");
+    LOG_END;
+  }
+#endif
 }
 
 AuthPriv::~AuthPriv()
@@ -1281,17 +1311,25 @@ int AuthMD5::auth_inc_msg(const unsigned char *key,
     return SNMPv3_USM_AUTHENTICATION_FAILURE;
   }
 
-  /* compare digest to received digest */
+  // fully compare digest to received digest to avoid timing attacks
+  bool hash_valid = true;
   for (int i=0; i < 12 ; ++i)
   {
     if (auth_par_ptr[i] != receivedDigest[i])
     {
-      /* copy digest back into message and return error */
-      memcpy(auth_par_ptr, receivedDigest, 12);
-      debugprintf(4, "MD5 authentication FAILED.");
-      return SNMPv3_USM_AUTHENTICATION_FAILURE;
+      if (hash_valid)
+        hash_valid = false;
     }
   }
+
+  if (!hash_valid)
+  {
+    /* copy digest back into message and return error */
+    memcpy(auth_par_ptr, receivedDigest, 12);
+    debugprintf(4, "MD5 authentication FAILED.");
+    return SNMPv3_USM_AUTHENTICATION_FAILURE;
+  }
+
   debugprintf(4, "MD5 authentication OK.");
   return SNMPv3_USM_OK;
 }
@@ -1359,6 +1397,74 @@ int PrivDES::encrypt(const unsigned char *key,
                   initVect, 8);
 #endif
 
+#if OPENSSL_VERSION_NUMBER >= 0x30000000
+  EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+  if (!ctx)
+  {
+    debugprintf(1, "EVP_CIPHER_CTX_new() failed.");
+    return SNMPv3_USM_ENCRYPTION_ERROR;
+  }
+
+  const EVP_CIPHER *evp_cipher = EVP_CIPHER_fetch(NULL, "DES-CBC", NULL);
+  if (evp_cipher == nullptr)
+  {
+    debugprintf(1, "EVP_CIPHER_fetch() failed.");
+    //ERR_print_errors_fp(stderr);
+    EVP_CIPHER_CTX_free(ctx);
+    return SNMPv3_USM_ENCRYPTION_ERROR;
+  }
+
+  if (EVP_EncryptInit_ex2(ctx, evp_cipher, key, initVect, NULL) != 1)
+  {
+    debugprintf(1, "EVP_EncryptInit_ex2() failed.");
+    EVP_CIPHER_CTX_free(ctx);
+    return SNMPv3_USM_ENCRYPTION_ERROR;
+  }
+
+  // We have to do the padding ourselves!
+  EVP_CIPHER_CTX_set_padding(ctx, 0);
+
+  int len1 = *out_buffer_len;
+  if (EVP_EncryptUpdate(ctx, out_buffer, &len1, buffer, buffer_len) != 1)
+  {
+    debugprintf(1, "EVP_EncryptUpdate() failed.");
+    EVP_CIPHER_CTX_free(ctx);
+    return SNMPv3_USM_ENCRYPTION_ERROR;
+  }
+
+  // Add padding if needed
+  if (buffer_len % 8)
+  {
+     unsigned char tmp_buf[8];
+     memset(tmp_buf, 0, 8);
+
+     int len_pad = *out_buffer_len - len1;
+
+     if (EVP_EncryptUpdate(ctx, out_buffer + len1, &len_pad, tmp_buf, 8 - (buffer_len % 8)) != 1)
+     {
+       debugprintf(1, "EVP_EncryptUpdate() failed.");
+       EVP_CIPHER_CTX_free(ctx);
+       return SNMPv3_USM_ENCRYPTION_ERROR;
+     }
+
+     len1 += len_pad;
+  }
+
+  unsigned char *out_buffer_ptr = out_buffer + len1;
+  int len2 = *out_buffer_len - len1;
+  if (EVP_EncryptFinal_ex(ctx, out_buffer_ptr, &len2) != 1)
+  {
+    debugprintf(1, "EVP_EncryptFinal_ex() failed.");
+    EVP_CIPHER_CTX_free(ctx);
+    return SNMPv3_USM_ENCRYPTION_ERROR;
+  }
+
+  EVP_CIPHER_CTX_free(ctx);
+
+  *out_buffer_len = len1 + len2;
+
+#else // OPENSSL_VERSION_NUMBER >= 0x30000000
+
   DESCBCType symcbc;
   DES_CBC_START_ENCRYPT(cipher, initVect, key, 8, 16, symcbc);
 
@@ -1383,6 +1489,7 @@ int PrivDES::encrypt(const unsigned char *key,
 
   /* Clear context buffer (paranoia!)*/
   DES_MEMSET(symcbc, 0, sizeof(symcbc));
+#endif
 
 #ifdef __DEBUG
   debughexcprintf(21, "apDESEncryptData: created privacy_params",
@@ -1395,13 +1502,12 @@ int PrivDES::encrypt(const unsigned char *key,
 }
 
 
-
 int PrivDES::decrypt(const unsigned char *key,
                      const unsigned int   /*key_len*/,
                      const unsigned char *buffer,
                      const unsigned int   buffer_len,
-                     unsigned char *outBuffer,
-                     unsigned int  *outBuffer_len,
+                     unsigned char *out_buffer,
+                     unsigned int  *out_buffer_len,
                      const unsigned char *privacy_params,
                      const unsigned int   privacy_params_len,
                      const unsigned long  /*engine_boots*/,
@@ -1416,7 +1522,7 @@ int PrivDES::decrypt(const unsigned char *key,
   for (int i=0; i<8; i++)
     initVect[i] = privacy_params[i] ^ key[i+8];
 
-  memset((char*)outBuffer, 0, *outBuffer_len);
+  memset((char*)out_buffer, 0, *out_buffer_len);
 
 #ifdef __DEBUG
   debughexcprintf(21, "apDESDecryptData: Data to decrypt",
@@ -1429,19 +1535,73 @@ int PrivDES::decrypt(const unsigned char *key,
                   initVect, 8);
 #endif
 
+#if OPENSSL_VERSION_NUMBER >= 0x30000000
+
+  EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+  if (!ctx)
+  {
+    debugprintf(1, "EVP_CIPHER_CTX_new() failed.");
+    return SNMPv3_USM_DECRYPTION_ERROR;
+  }
+
+  const EVP_CIPHER *evp_cipher = EVP_CIPHER_fetch(NULL, "DES-CBC", NULL);
+  if (evp_cipher == nullptr)
+  {
+    debugprintf(1, "EVP_CIPHER_fetch() failed.");
+    EVP_CIPHER_CTX_free(ctx);
+    return SNMPv3_USM_DECRYPTION_ERROR;
+  }
+
+  if (EVP_DecryptInit_ex2(ctx, evp_cipher, key, initVect, NULL) != 1)
+  {
+    debugprintf(1, "EVP_DecryptInit_ex2() failed.");
+    EVP_CIPHER_CTX_free(ctx);
+    return SNMPv3_USM_DECRYPTION_ERROR;
+  }
+
+  // We have to do the padding ourselves!
+  EVP_CIPHER_CTX_set_padding(ctx, 0);
+
+  int len1 = *out_buffer_len;
+  if (EVP_DecryptUpdate(ctx, out_buffer, &len1, buffer, buffer_len) != 1)
+  {
+    debugprintf(1, "EVP_DecryptUpdate() failed.");
+    EVP_CIPHER_CTX_free(ctx);
+    return SNMPv3_USM_DECRYPTION_ERROR;
+  }
+
+  unsigned char *out_buffer_ptr = out_buffer + len1;
+  int len2 = *out_buffer_len - len1;
+  if (EVP_DecryptFinal_ex(ctx, out_buffer_ptr, &len2) != 1)
+  {
+    debugprintf(1, "EVP_DecryptFinal_ex() failed.");
+    EVP_CIPHER_CTX_free(ctx);
+    return SNMPv3_USM_DECRYPTION_ERROR;
+  }
+
+  EVP_CIPHER_CTX_free(ctx);
+
+  if (len1 + len2 != static_cast<int>(buffer_len)) {
+    debugprintf(1, "Encryption wrote (%d + %d) bytes instead of (%d)", len1, len2, buffer_len);
+    return SNMPv3_USM_DECRYPTION_ERROR;
+  }
+
+#else // OPENSSL_VERSION_NUMBER >= 0x30000000
+
   DESCBCType symcbc;
   DES_CBC_START_DECRYPT(cipher, initVect, key, 8, 16, symcbc);
   for(unsigned int j=0; j<buffer_len; j+=8 ) {
-    DES_CBC_DECRYPT(buffer + j, outBuffer + j, symcbc, initVect, 8);
+    DES_CBC_DECRYPT(buffer + j, out_buffer + j, symcbc, initVect, 8);
   }
   /* Clear context (paranoia!) */
   DES_MEMSET(symcbc, 0, sizeof(symcbc));
+#endif
 
-  *outBuffer_len = buffer_len;
+  *out_buffer_len = buffer_len;
 
 #ifdef __DEBUG
   debughexcprintf(21, "apDESDecryptData: decrypted Data",
-                  outBuffer, *outBuffer_len);
+                  out_buffer, *out_buffer_len);
 #endif
 
   return SNMPv3_USM_OK;
@@ -2445,17 +2605,25 @@ int AuthSHABase::auth_inc_msg(const unsigned char *key,
     return SNMPv3_USM_AUTHENTICATION_FAILURE;
   }
 
-  /* compare digest to received digest */
+  // fully compare digest to received digest to avoid timing attacks
+  bool hash_valid = true;
   for (int i=0; i < auth_par_len ; ++i)
   {
     if (auth_par_ptr[i] != receivedDigest[i])
     {
-      /* copy digest back into message and return error */
-      memcpy(auth_par_ptr, receivedDigest, auth_par_len);
-      debugprintf(4, "SHA authentication FAILED.");
-      return SNMPv3_USM_AUTHENTICATION_FAILURE;
+      if (hash_valid)
+        hash_valid = false;
     }
   }
+
+  if (!hash_valid)
+  {
+    /* copy digest back into message and return error */
+    memcpy(auth_par_ptr, receivedDigest, auth_par_len);
+    debugprintf(4, "SHA authentication FAILED.");
+    return SNMPv3_USM_AUTHENTICATION_FAILURE;
+  }
+
   debugprintf(4, "SHA authentication OK.");
   return SNMPv3_USM_OK;
 }

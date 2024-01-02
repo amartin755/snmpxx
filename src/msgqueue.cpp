@@ -60,6 +60,7 @@ char msgqueue_version[]="#(@) SNMP++ $Id$";
 #include "snmp_pp/eventlistholder.h"
 #include "snmp_pp/log.h"
 #include "snmp_pp/vb.h"
+#include "snmp_pp/v3.h"
 
 #ifdef SNMP_PP_NAMESPACE
 namespace Snmp_pp {
@@ -91,7 +92,6 @@ CSNMPMessage::CSNMPMessage(unsigned long id,
   m_rawPduLen(rawPduLen), m_callBack(callBack), m_callData(callData),
   m_reason(0), m_received(0), m_locked(false)
 {
-  // reset pdu mvs
   m_pdu.set_error_index(0);
   m_pdu.set_error_status(0);
   m_pdu.set_request_id(m_uniqueId);
@@ -111,6 +111,21 @@ CSNMPMessage::~CSNMPMessage()
   delete m_target;
 }
 
+void CSNMPMessage::Update(unsigned char *rawPdu, size_t rawPduLen)
+{
+  LOG_BEGIN(loggerModuleName, DEBUG_LOG | 10);
+  LOG("MsgQueue: Update Entry (id)");
+  LOG(m_pdu.get_request_id());
+  LOG_END;
+
+  if (rawPduLen != m_rawPduLen) {
+    delete [] m_rawPdu;
+    m_rawPdu = new unsigned char[rawPduLen];
+  }
+  memcpy(m_rawPdu, rawPdu, rawPduLen);
+  m_rawPduLen = rawPduLen;
+}
+
 void CSNMPMessage::SetSendTime()
 {
   m_sendTime.refresh();
@@ -124,9 +139,22 @@ void CSNMPMessage::SetSendTime()
 }
 
 int CSNMPMessage::SetPdu(const int reason, const Pdu &pdu,
-                         const UdpAddress &fromaddress)
+                         const UdpAddress & /* fromaddress */)
 {
-  (void)fromaddress;
+#ifdef _SNMPv3
+  if (m_pdu.get_message_id() != pdu.get_message_id())
+  {
+    LOG_BEGIN(loggerModuleName, INFO_LOG | 1);
+    LOG("MsgQueue: Ignore response that does not match message id: (id1) (type2) (msgid1) (msgid2");
+    LOG(m_pdu.get_request_id());
+    LOG(pdu.get_request_id());
+    LOG(m_pdu.get_message_id());
+    LOG(pdu.get_message_id());
+    LOG_END;
+    return -1;
+  }
+#endif
+
   if (Pdu::match_type(m_pdu.get_type(), pdu.get_type()) == false)
   {
     LOG_BEGIN(loggerModuleName, INFO_LOG | 1);
@@ -212,9 +240,11 @@ int CSNMPMessage::ResendMessage()
   }
 
   LOG_BEGIN(loggerModuleName, DEBUG_LOG | 10);
-  LOG("MsgQueue: Message (msg id) (req id) (info)");
 #ifdef _SNMPv3
+  LOG("MsgQueue: Message (msg id) (req id) (info)");
   LOG(m_pdu.get_message_id());
+#else
+  LOG("MsgQueue: Message (req id) (info)");
 #endif
   LOG(m_pdu.get_request_id());
   LOG((m_target->get_retry() <= 0) ? "TIMEOUT" : "RESEND");
@@ -224,13 +254,24 @@ int CSNMPMessage::ResendMessage()
   {
     // This message has timed out
     Callback(SNMP_CLASS_TIMEOUT);   // perform callback with the error
-
     return SNMP_CLASS_TIMEOUT;
   }
 
   m_target->set_retry(m_target->get_retry() - 1);
   SetSendTime();
-  int status = send_snmp_request(m_socket, m_rawPdu, m_rawPduLen, *m_address);
+  int status;
+  if (m_target->get_version() == version3) {
+#ifdef _SNMPv3
+    // delete entry in cache
+    if (m_snmp->get_mpv3())
+	    m_snmp->get_mpv3()->delete_from_cache(m_pdu.get_request_id());
+#endif
+    status = m_snmp->snmp_engine(m_pdu, m_pdu.get_error_status(), m_pdu.get_error_index(),
+		    *m_target, m_callBack, m_callData, m_socket, 0, this);
+  }
+  else {
+    status = send_snmp_request(m_socket, m_rawPdu, m_rawPduLen, *m_address);
+  }
   if (status != 0)
     return SNMP_CLASS_TL_FAILED;
 
@@ -332,10 +373,8 @@ CSNMPMessage * CSNMPMessageQueue::AddEntry(unsigned long id,
                                           callBack, callData);
 
   lock();
-    /*---------------------------------------------------------*/
-    /* Insert entry at head of list, done automagically by the */
-    /* constructor function, so don't use the return value.    */
-    /*---------------------------------------------------------*/
+  // Insert entry at head of list, done automatically by the
+  // constructor function, so don't use the return value.
   (void) new CSNMPMessageQueueElt(newMsg, m_head.GetNext(), &m_head);
   ++m_msgCount;
   int count = m_msgCount;
@@ -841,12 +880,6 @@ int CSNMPMessageQueue::DoRetries(const msec &now)
   }
   unlock();
   return status;
-}
-
-
-int CSNMPMessageQueue::Done()
-{
-    return 0;
 }
 
 int CSNMPMessageQueue::Done(unsigned long id)

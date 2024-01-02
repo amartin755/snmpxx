@@ -51,7 +51,6 @@
   Class definition for SMI Timeticks class.
 
 =====================================================================*/
-// $Id$
 
 #ifndef _SNMP_TIMETICK_H_
 #define _SNMP_TIMETICK_H_
@@ -63,7 +62,7 @@
 namespace Snmp_pp {
 #endif
 
-#define TICKOUTBUF 30 // max formatted time string
+#define TICKOUTBUF 32 // max formatted time string
 
 //------------[ TimeTicks Class ]-----------------------------------
 /**
@@ -124,7 +123,7 @@ class DLLOPT TimeTicks : public SnmpUInt32
   /**
    * Map other SnmpSyntax objects to TimeTicks.
    */
-  using SnmpUInt32::operator = ;
+  using SnmpUInt32::operator=;
 
   /**
    * Overloaded assignment for TimeTicks.

@@ -59,6 +59,7 @@ class Snmp;
 class EventListHolder;
 class Pdu;
 class v3MP;
+class CSNMPMessage;
 
 //-----------[ async methods callback ]-----------------------------------
 /**
@@ -105,6 +106,8 @@ bool setCloseOnExecFlag(SnmpSocket fd);
  */
 class DLLOPT Snmp: public SnmpSynchronized
 {
+  friend class CSNMPMessage;
+
  public:
   //------------------[ constructors ]----------------------------------
 
@@ -621,7 +624,8 @@ protected:
                    const snmp_callback cb,    // async callback function
                    const void *cbd,          // callback data
 		   SnmpSocket fd = INVALID_SOCKET,
-		   int reports_received = 0);
+		   int reports_received = 0,
+		   CSNMPMessage *snmp_message = nullptr);
 
   //--------[ map action ]------------------------------------------------
   // map the snmp++ action to a SMI pdu type
@@ -656,7 +660,7 @@ protected:
 #endif
 
   IpAddress listen_address;
-  long current_rid;                   // current rid to use
+  unsigned long current_rid;                   // current rid to use
 
   // inform receive member variables
   snmp_callback  notifycallback;

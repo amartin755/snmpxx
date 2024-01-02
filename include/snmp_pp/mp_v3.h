@@ -108,6 +108,7 @@ class DLLOPT v3MP
 {
   friend class SnmpMessage;
   friend class CSNMPMessageQueue;
+  friend class CSNMPMessage;
  public:
   /**
    * Initialize the v3MP.

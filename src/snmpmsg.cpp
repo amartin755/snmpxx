@@ -58,6 +58,7 @@ char snmpmsg_cpp_version[]="#(@) SNMP++ $Id$";
 #include "snmp_pp/oid_def.h"                    // changed (Frank Fock)
 #include "snmp_pp/log.h"
 #include "snmp_pp/vb.h"
+#include "snmp_pp/v3.h"
 #include "snmp_pp/usm_v3.h"
 
 #ifdef SNMP_PP_NAMESPACE
@@ -208,7 +209,7 @@ int SnmpMessage::load(
 #ifdef _SNMPv3
                       v3MP* mpv3, 
 #endif
-                      const Pdu &cpdu,
+                      Pdu &cpdu,
                       const OctetStr &community,
                       const snmp_version version,
                       const OctetStr* engine_id,
@@ -224,8 +225,7 @@ int SnmpMessage::load(
     return SNMP_CLASS_INVALID_PDU;
 
   // create a raw pdu
-  snmp_pdu *raw_pdu;
-  raw_pdu = snmp_pdu_create((int) pdu->get_type());
+  snmp_pdu *raw_pdu = snmp_pdu_create((int) pdu->get_type());
 
   Oid enterprise;
 
@@ -464,6 +464,9 @@ int SnmpMessage::load(
         }
         snmp_free_pdu(raw_pdu);
         return SNMP_ERROR_TOO_BIG;
+      }
+      if (pdu->get_type() != sNMP_PDU_RESPONSE) {
+	cpdu.set_message_id(raw_pdu->msgid);
       }
     }
   }

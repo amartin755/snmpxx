@@ -543,7 +543,7 @@ void v3MP::Cache::delete_entry(unsigned long req_id, bool local_request)
   return;
 }
 
-// Delete the entry with the given request ans message id from the cache.
+// Delete the entry with the given request and message id from the cache.
 void v3MP::Cache::delete_entry(unsigned long req_id, int msg_id,
 			       bool local_request)
 {
@@ -570,11 +570,11 @@ void v3MP::Cache::delete_entry(unsigned long req_id, int msg_id,
       {
         table[i] = table[entries];
 
-	LOG_BEGIN(loggerModuleName, INFO_LOG | 10);
-	LOG("v3MP::Cache: Moving entry (from) (to)");
-	LOG(entries);
-	LOG(i);
-	LOG_END;
+        LOG_BEGIN(loggerModuleName, INFO_LOG | 10);
+        LOG("v3MP::Cache: Moving entry (from) (to)");
+        LOG(entries);
+        LOG(i);
+        LOG_END;
       }
       return;
     }
@@ -585,8 +585,6 @@ void v3MP::Cache::delete_entry(unsigned long req_id, int msg_id,
   LOG(msg_id);
   LOG(local_request ? "local" : "remote");
   LOG_END;
-
-  return;
 }
 
 // Search the cache for a message id, return it and remove it from the cache
@@ -663,7 +661,7 @@ v3MP::v3MP(const OctetStr& snmpEngineID,
   snmpInvalidMsgs = 0;
   snmpUnknownPDUHandlers = 0;
 
-  int length = snmpEngineID.len();
+  int length = (int)snmpEngineID.len();
   if (length > MAXLENGTH_ENGINEID)
     length = MAXLENGTH_ENGINEID;
 
@@ -1342,6 +1340,7 @@ int v3MP::snmp_build(struct snmp_pdu *pdu,
 
     cur_msg_id_lock.lock();
     msgID = cur_msg_id;
+    pdu->msgid = msgID;
     cur_msg_id++;
     if (cur_msg_id >= MAX_MPMSGID)
       cur_msg_id = 1;

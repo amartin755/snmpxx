@@ -1529,11 +1529,11 @@ int Snmp::snmp_engine( Pdu &pdu,              // pdu to use
                        const snmp_callback cb,// callback for async calls
                        const void *cbd,      // callback data
 		       SnmpSocket fd,
-		       int reports_received)
-
+		       int reports_received,
+		       CSNMPMessage *snmp_message)
 {
-  long req_id = 0;                   // pdu request id
-  int status;                        // send status
+  unsigned long req_id = 0; // pdu request id
+  int status = 0;  // status
 
 #ifdef _SNMPv3
   // save original PDU for later reference
@@ -1542,7 +1542,6 @@ int Snmp::snmp_engine( Pdu &pdu,              // pdu to use
   for (int maxloops=0; maxloops<3; maxloops++)
   {
 #endif
-
     unsigned short pdu_action;        // type of pdu to build
     unsigned short action;        // type of pdu to build
     unsigned long my_timeout;        // target specific timeout
@@ -1585,14 +1584,14 @@ int Snmp::snmp_engine( Pdu &pdu,              // pdu to use
 
     //---------[ make sure target is valid ]-------------------------
     // make sure that the target is valid
-    if ( ! target.valid())
+    if (!target.valid())
       return SNMP_CLASS_INVALID_TARGET;
 
     OctetStr community_string;
     OctetStr security_name;
     int security_model;
-    const CTarget* ctarget = NULL;
-    const UTarget* utarget = NULL;
+    CTarget* ctarget = NULL;
+    UTarget* utarget = NULL;
 
     switch (target.get_type())
     {
@@ -1726,6 +1725,7 @@ int Snmp::snmp_engine( Pdu &pdu,              // pdu to use
 	{
 	  udp_address.map_to_ipv6();
 	  iv_session_used = iv_snmp_session_ipv6;
+	  target.set_address(udp_address); // Update target with mapped address
 	}
       }
       else
@@ -1742,8 +1742,13 @@ int Snmp::snmp_engine( Pdu &pdu,              // pdu to use
       pdu.set_error_index(0);
 
       // determine request id to use
-      req_id = MyMakeReqId();
-      pdu.set_request_id(req_id);
+      if (snmp_message) {
+	// Use existing request id in case of resend after timeout
+        req_id = snmp_message->GetId();
+      } else {
+	req_id = MyMakeReqId();
+        pdu.set_request_id(req_id);
+      }
     }
 
     //---------[ map GetBulk over v1 to GetNext ]-------------------------
@@ -1775,8 +1780,7 @@ int Snmp::snmp_engine( Pdu &pdu,              // pdu to use
                                            udp_address.get_printable())
             == SNMPv3_MP_OK )
         {
-          // Override const here
-          ((UTarget*)utarget)->set_engine_id(engine_id);
+          utarget->set_engine_id(engine_id);
         }
         else
         {
@@ -1788,7 +1792,7 @@ int Snmp::snmp_engine( Pdu &pdu,              // pdu to use
                (pdu_action == sNMP_PDU_GETBULK) ||
                (pdu_action == sNMP_PDU_INFORM)))
           {
-            // no engine id, discovery disabled and not authoritytive
+            // no engine id, discovery disabled and not authoritative
             LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
             LOG("Not authoritative and discovery disabled. Target without engine id is invalid");
             LOG_END;
@@ -1805,11 +1809,11 @@ int Snmp::snmp_engine( Pdu &pdu,              // pdu to use
         backupPdu.set_context_engine_id(engine_id);
       }
 
-      debugprintf(4,"Snmp::snmp_engine: engineID (%s), securityName (%s)"
+      debugprintf(4, "Snmp::snmp_engine: engineID (%s), securityName (%s)"
                   "securityModel (%i) security_level (%i)",
                   engine_id.get_printable(), security_name.get_printable(),
                   security_model, pdu.get_security_level());
-      debugprintf(4," Addr/Port (%s)",udp_address.get_printable());
+      debugprintf(4, " Addr/Port (%s)", udp_address.get_printable());
 
       status = snmpmsg.loadv3(mpv3, pdu, engine_id, security_name,
                               security_model, (snmp_version)version);
@@ -1828,12 +1832,16 @@ int Snmp::snmp_engine( Pdu &pdu,              // pdu to use
     if ((pdu_action != sNMP_PDU_RESPONSE) &&
         (pdu_action != sNMP_PDU_REPORT))
     {
+        snmp_callback callback = cb;
+        const void *callback_data = cbd;
+
 #ifdef _SNMPv3
-	if ((version == version3) && ((action == sNMP_PDU_GET_ASYNC) ||
-				      (action == sNMP_PDU_SET_ASYNC) ||
-				      (action == sNMP_PDU_GETNEXT_ASYNC) ||
-				      (action == sNMP_PDU_GETBULK_ASYNC) ||
-				      (action == sNMP_PDU_INFORM_ASYNC))) {
+	if ((snmp_message == nullptr) && (version == version3) &&
+	    ((action == sNMP_PDU_GET_ASYNC) ||
+	     (action == sNMP_PDU_SET_ASYNC) ||
+	     (action == sNMP_PDU_GETNEXT_ASYNC) ||
+	     (action == sNMP_PDU_GETBULK_ASYNC) ||
+	     (action == sNMP_PDU_INFORM_ASYNC))) {
 	    // add callback for v3
 	    v3CallBackData = new struct V3CallBackData;
 
@@ -1847,17 +1855,19 @@ int Snmp::snmp_engine( Pdu &pdu,              // pdu to use
 	    v3CallBackData->cbd = cbd;
 	    v3CallBackData->reports_received = reports_received;
 
-	    // Add the message to the message queue
-	    eventListHolder->snmpEventList()->AddEntry(req_id, this, iv_session_used,
-		     target, pdu, snmpmsg.data(), (size_t) snmpmsg.len(),
-		     udp_address, v3CallBack, (void *)v3CallBackData);
+	    callback = v3CallBack;
+	    callback_data = (void *)v3CallBackData;
 	}
-	else
 #endif
-	{
-	    eventListHolder->snmpEventList()->AddEntry(req_id, this, iv_session_used,
-		     target, pdu, snmpmsg.data(), (size_t) snmpmsg.len(),
-		     udp_address, cb, (void *)cbd);
+	if (snmp_message == nullptr) {
+	  // Add the message to the message queue
+	  eventListHolder->snmpEventList()->AddEntry(req_id, this, iv_session_used,
+			  target, pdu, snmpmsg.data(), (size_t) snmpmsg.len(),
+			  udp_address, callback, (void*)callback_data);
+	}
+	else {
+	  // Update existing message
+	  snmp_message->Update(snmpmsg.data(), (size_t) snmpmsg.len());
 	}
     }
 
@@ -1867,6 +1877,11 @@ int Snmp::snmp_engine( Pdu &pdu,              // pdu to use
 			       snmpmsg.data(), (size_t) snmpmsg.len(),
 			       udp_address);
     unlock();
+
+    if (snmp_message != nullptr) {
+	// We can return status here
+	return status;
+    }
 
     if (status != 0)
     {
