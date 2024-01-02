@@ -19,7 +19,7 @@ jobs:
 
     - name: Install Dependencies
       # install libpcap and its development files
-      run: sudo apt-get --assume-yes install openssl-dev
+      run: sudo apt-get --assume-yes install libssl-dev
 
     - name: Configure CMake
       # Use a bash shell so we can use the same syntax for environment variable
