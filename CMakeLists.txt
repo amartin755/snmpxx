@@ -356,6 +356,10 @@ if (NOT HAVE_SIZE_T)
   endif ("${CMAKE_SIZEOF_VOID_P}" EQUAL 8)
 endif ()
 
+# check if sys/types.h really defined pid_t
+if (HAVE_SYS_TYPES_H)
+  check_type_size (pid_t PID_T LANGUAGE CXX)
+endif ()
 
 check_include_files (malloc.h HAVE_MALLOC_H)
 check_include_files ("sys/param.h;sys/mount.h" HAVE_SYS_MOUNT_H)
@@ -370,7 +374,10 @@ set (CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DHAVE_CONFIG_H")
 
 if (MSVC)
     # warning level 4 (all warnings as errors: /WX)
-    add_compile_options (/W4 /WX)
+    add_compile_options (/W4)
+    # disable warnings for depracated functions
+    add_compile_definitions (_CRT_SECURE_NO_WARNINGS)
+    add_compile_definitions (_WINSOCK_DEPRECATED_NO_WARNINGS)
 else ()
     # Add "-Wextra -pedantic" to get more warnings
     add_compile_options (-Wall)
@@ -463,7 +470,12 @@ set (MY_SRC_FILES
   src/vb.cpp
 )
 
-link_libraries (${CRYPTO_LINKLIBS})
+if (NOT WIN32)
+  link_libraries (${CRYPTO_LINKLIBS})
+else ()
+  link_libraries (${CRYPTO_LINKLIBS} ws2_32)
+  set (CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif ()
 
 add_library (snmp++ SHARED
   ${MY_HEADER_FILES}
@@ -488,15 +500,18 @@ set (EXAMPLE_SOURCE_FILES
   consoleExamples/snmpSet.cpp
   consoleExamples/snmpTraps.cpp
   consoleExamples/snmpWalk.cpp
-  consoleExamples/snmpWalkThreads.cpp
   consoleExamples/test_app.cpp
 )
+if (NOT WIN32)
+  set (EXAMPLE_SOURCE_FILES ${EXAMPLE_SOURCE_FILES} consoleExamples/snmpWalkThreads.cpp)
+endif ()
+
 
 foreach (examplesourcefile ${EXAMPLE_SOURCE_FILES})
     string (REPLACE ".cpp" "" examplename ${examplesourcefile})
     string (REPLACE "consoleExamples/" "" examplename ${examplename})
     add_executable (${examplename} ${examplesourcefile})
-    target_link_libraries (${examplename} snmp++)
+    target_link_libraries (${examplename} snmp++_static)
     if (WITH_THREADS)
       if (NOT APPLE)
         target_link_libraries (${examplename} Threads::Threads)
