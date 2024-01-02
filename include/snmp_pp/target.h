@@ -246,7 +246,7 @@ class DLLOPT SnmpTarget
   void set_version(const snmp_version v) { version = v; };
 
   /**
-   * Overloeaded compare operator.
+   * Overloaded compare operator.
    *
    * Two SnmpTarget objects are considered equal, if all member
    * variables are equal.
@@ -259,6 +259,13 @@ class DLLOPT SnmpTarget
    * Reset the object.
    */
   virtual void clear();
+
+  /**
+   * Get a human readable string for the given SNMP version.
+   * @param version enum
+   * @return String for a valid version or "unknown".
+   */
+  static const char* version_to_string(const snmp_version version);
 
  protected:
   bool validity;         ///< Validity of the object

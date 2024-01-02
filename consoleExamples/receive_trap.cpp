@@ -45,8 +45,22 @@ void callback(int reason, Snmp *snmp, Pdu &pdu, SnmpTarget &target, void *cd)
   UdpAddress from(addr);
 
   std::cout << "reason: " << reason << std::endl
-       << "msg: " << snmp->error_msg(reason) << std::endl
-       << "from: " << from.get_printable() << std::endl;
+            << "msg: " << snmp->error_msg(reason) << std::endl
+            << "from: " << from.get_printable() << std::endl
+            << "SNMP version: " << SnmpTarget::version_to_string(target.get_version()) << std::endl;
+
+  if (target.get_type() == SnmpTarget::type_ctarget) {
+    CTarget *ctarget =  (CTarget*)&target;
+    std::cout << "Read community: " << ctarget->get_readcommunity() << std::endl
+              << "Write community: " << ctarget->get_writecommunity() << std::endl;
+  } else if (target.get_type() == SnmpTarget::type_utarget) {
+    UTarget *utarget =  (UTarget*)&target;
+    std::cout << "Security name: " << utarget->get_security_name().get_printable() << std::endl
+              << "Security model: " << utarget->get_security_model() << std::endl;
+#ifdef _SNMPv3
+    std::cout << "Security level: " << pdu.get_security_level() << std::endl;
+#endif
+  }
 
   pdu_error = pdu.get_error_status();
   if (pdu_error){
@@ -85,6 +99,7 @@ int main(int argc, char **argv)
 
   //----------[ create a SNMP++ session ]-----------------------------------
   int status; 
+  srand(time(0)); // Init RNG as required by Snmp class
   Snmp::socket_startup();  // Initialize socket subsystem
   Snmp snmp(status);                // check construction status
   if (status != SNMP_CLASS_SUCCESS)

@@ -32,10 +32,10 @@
 #include <libsnmp.h>
 #endif
 
-#define SNMP_PP_VERSION_STRING "3.4.9"
+#define SNMP_PP_VERSION_STRING "3.4.10"
 #define SNMP_PP_VERSION 3
 #define SNMP_PP_RELEASE 4
-#define SNMP_PP_PATCHLEVEL 9
+#define SNMP_PP_PATCHLEVEL 10
 
 //! The maximum size of a message that can be sent or received.
 #define MAX_SNMP_PACKET 4096
@@ -197,12 +197,12 @@
 
 // Define a unsigned 64 bit integer:
 #ifdef WIN32
-#include <windows.h>
 #if defined(HAVE_WINSOCK2_H)
 #include <winsock2.h>
 #elif defined(HAVE_WINSOCK_H)
 #include <winsock.h>
 #endif
+#include <windows.h>
 #ifdef HAVE_WSTCPIP_H
 #include <ws2tcpip.h>
 #endif

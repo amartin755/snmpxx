@@ -51,7 +51,6 @@
   Adapted and integrated into snmp++ by Ragavan Tetchinamourty
 
 =====================================================================*/
-//XXX char ipv6utility_cpp_version[] = "@(#) SNMP++ $Id: $";
 
 #include <libsnmp.h>
 
@@ -75,11 +74,11 @@
 static int
 snprintf (char *str, int n, char *fmt, ...)
 {
-va_list a;
-va_start (a, fmt);
-int ret = vsnprintf (str, n, fmt, a);
-va_end (a);
-return ret;
+  va_list a;
+  va_start (a, fmt);
+  int ret = vsnprintf (str, n, fmt, a);
+  va_end (a);
+  return ret;
 }
 #endif
 
@@ -129,11 +128,10 @@ inet_ntop(int af, const void *src, char *dst, size_t size)
 static const char *
 inet_ntop4(const unsigned char *src, char *dst, size_t size)
 {
-	/*static const */char *fmt = "%u.%u.%u.%u";
 	char tmp[sizeof "255.255.255.255"];
 	size_t len;
 
-	len = snprintf(tmp, sizeof tmp, fmt, src[0], src[1], src[2], src[3]);	
+	len = snprintf(tmp, sizeof tmp, "%u.%u.%u.%u", src[0], src[1], src[2], src[3]);	
 	
 	if (len >= size) {
 		errno = ENOSPC;
