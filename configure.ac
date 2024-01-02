@@ -29,10 +29,10 @@ dnl Process this file with autoconf to produce a configure script.
 
 dnl don't require higher autoconf version for win32 support
 AC_PREREQ([2.64])
-AC_INIT([snmp++], [3.5.0], [support@agentpp.com],[snmp++])
+AC_INIT([snmp++], [3.5.1], [support@agentpp.com],[snmp++])
 SNMP_PP_MAJOR_VERSION=3
 SNMP_PP_MINOR_VERSION=5
-SNMP_PP_MICRO_VERSION=0
+SNMP_PP_MICRO_VERSION=1
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([-Wall foreign])
@@ -75,7 +75,8 @@ PKG_PROG_PKG_CONFIG
 
 dnl Check for extra flags to enable some kind of behavior
 AC_CHECK_DECL([_AIX],[ac_cv_need_minus_d_linux_source_compat="yes"; ac_cv_need_minus_d_all_source="yes"])
-AC_CHECK_DECL([__linux],[ac_cv_need_minus_d_gnu_source="yes"]) dnl probably required by kfreebsd, too?
+AC_CHECK_DECL([__linux],[ac_cv_need_minus_d_gnu_source="yes"])
+dnl probably required by kfreebsd, too?
 AC_CHECK_DECL([__sun],[ac_cv_need_minus_d_extensions="yes"])
 
 AS_IF([test "x$ac_cv_need_minus_d_linux_source_compat" = "xyes"],

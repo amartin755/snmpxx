@@ -1,7 +1,7 @@
 message (STATUS "Running with CMake ${CMAKE_VERSION}")
 cmake_minimum_required (VERSION 3.15)
 
-project (snmp_pp VERSION 3.5.0 LANGUAGES CXX)
+project (snmp_pp VERSION 3.5.1 LANGUAGES CXX)
 enable_language (CXX)
 
 include (CheckIncludeFiles)

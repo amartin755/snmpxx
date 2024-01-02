@@ -1,3 +1,7 @@
+Changes snmp++v3.5.1
+====================
+- Fixed: Compilation error if _SNMPv3 is not defined (Fabrice Fontaine)
+
 Changes snmp++v3.5.0
 ====================
 
