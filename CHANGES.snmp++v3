@@ -1,3 +1,10 @@
+Changes snmp++v3.4.10
+=====================
+
+- Fixed: Winsock has to be included before windows header.
+- Fixed: Added SnmpTarget::version_to_string() function
+- Fixed: Fixed compiler warning on MSYS2 g++
+
 Changes snmp++v3.4.9
 ====================
 

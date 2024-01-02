@@ -197,12 +197,12 @@
 
 // Define a unsigned 64 bit integer:
 #ifdef WIN32
-#include <windows.h>
 #if defined(HAVE_WINSOCK2_H)
 #include <winsock2.h>
 #elif defined(HAVE_WINSOCK_H)
 #include <winsock.h>
 #endif
+#include <windows.h>
 #ifdef HAVE_WSTCPIP_H
 #include <ws2tcpip.h>
 #endif

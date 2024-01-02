@@ -65,6 +65,7 @@
 #define _SNMP_USERDEFINED_H_
 
 //----[ includes ]-----------------------------------------------------
+#include <libsnmp.h>
 #ifdef WIN32
 #include <winsock.h>
 #else

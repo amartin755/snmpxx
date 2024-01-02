@@ -128,6 +128,20 @@ void SnmpTarget::clear()
   my_address.clear();
 }
 
+// Get a human readable string for the given SNMP version.
+const char* SnmpTarget::version_to_string(const snmp_version version)
+{
+  switch (version) {
+    case version1:  return "SNMPv1";
+    case version2c: return "SNMPv2c";
+#ifdef _SNMPv3
+    case version3: return "SNMPv3";
+#endif
+    default: return "unknown";
+  }
+
+}
+
 //----------------------------------------------------------------------
 //--------[ CTarget Member Functions ]----------------------------------
 //----------------------------------------------------------------------
