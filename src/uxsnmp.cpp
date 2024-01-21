@@ -686,10 +686,9 @@ Snmp::Snmp( int &status,  const UdpAddress& addr_v4,
 {
   IpAddress *addresses[2];
 
-  listen_address = addr_v6;
-  IpAddress address_v4((IpAddress)addr_v4);
+  listen_address = addr_v4;
   IpAddress address_v6((IpAddress)addr_v6);
-  addresses[0] = &address_v4;
+  addresses[0] = &listen_address;
   addresses[1] = &address_v6;
 
   init(status, addresses, addr_v4.get_port(), addr_v6.get_port());
