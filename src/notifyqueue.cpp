@@ -455,6 +455,8 @@ int CNotifyEventQueue::AddEntry(Snmp *snmp,
 
 #ifdef NOTIFY_SET_IPV6_V6ONLY
       int on = 1;
+#else
+      int on = 0;
       if (setsockopt(m_notify_fd, IPPROTO_IPV6, IPV6_V6ONLY,
 		     (char *)&on, sizeof(on)) == -1)
       {

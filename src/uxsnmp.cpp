@@ -894,11 +894,14 @@ void Snmp::init(int& status, IpAddress *addresses[2],
 	return;
       }
 
+      int on = 0;
       mgr_addr.sin6_family = AF_INET6;
       mgr_addr.sin6_port = htons( port_v6);
       mgr_addr.sin6_scope_id = scope;
       // bind the socket
-      if (bind(iv_snmp_session_ipv6, (struct sockaddr*) &mgr_addr,
+      if (setsockopt(iv_snmp_session_ipv6, IPPROTO_IPV6, IPV6_V6ONLY,
+		           (char *)&on, sizeof(on)) < 0 ||
+        bind(iv_snmp_session_ipv6, (struct sockaddr*) &mgr_addr,
                sizeof(mgr_addr)) < 0)
       {
 #ifdef WIN32
